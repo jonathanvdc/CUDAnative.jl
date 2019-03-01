@@ -61,12 +61,17 @@ end
 
 ## helper functions
 
-# split keyword arguments to `@cuda` into ones affecting the compiler, or the execution
+# Split keyword arguments to `@cuda` into three categories:
+#   1. keyword arguments that affect the compiler,
+#   2. keyword arguments that affect the execution, and
+#   3. keyword arguments that affect the environment setup logic.
 function split_kwargs(kwargs)
     compiler_kws = [:minthreads, :maxthreads, :blocks_per_sm, :maxregs]
     call_kws     = [:blocks, :threads, :shmem, :stream]
+    env_kws      = [:init]
     compiler_kwargs = []
     call_kwargs = []
+    env_kwargs = []
     for kwarg in kwargs
         if Meta.isexpr(kwarg, :(=))
             key,val = kwarg.args
@@ -75,6 +80,8 @@ function split_kwargs(kwargs)
                     push!(compiler_kwargs, kwarg)
                 elseif key in call_kws
                     push!(call_kwargs, kwarg)
+                elseif key in env_kws
+                    push!(env_kwargs, kwarg)
                 else
                     throw(ArgumentError("unknown keyword argument '$key'"))
                 end
@@ -86,7 +93,7 @@ function split_kwargs(kwargs)
         end
     end
 
-    return compiler_kwargs, call_kwargs
+    return compiler_kwargs, call_kwargs, env_kwargs
 end
 
 # assign arguments to variables, handle splatting
@@ -195,7 +202,7 @@ macro cuda(ex...)
     args = call.args[2:end]
 
     code = quote end
-    compiler_kwargs, call_kwargs = split_kwargs(kwargs)
+    compiler_kwargs, call_kwargs, env_kwargs = split_kwargs(kwargs)
     vars, var_exprs = assign_args!(code, args)
 
     # convert the arguments, call the compiler and launch the kernel
@@ -206,6 +213,7 @@ macro cuda(ex...)
                 local kernel_args = cudaconvert.(($(var_exprs...),))
                 local kernel_tt = Tuple{Core.Typeof.(kernel_args)...}
                 local kernel = cufunction($(esc(f)), kernel_tt; $(map(esc, compiler_kwargs)...))
+                prepare_kernel(kernel; $(map(esc, env_kwargs)...))
                 kernel(kernel_args...; $(map(esc, call_kwargs)...))
             end
          end)
@@ -310,6 +318,21 @@ end
     end
 end
 
+"""
+    prepare_kernel(kernel::Kernel{F,TT}; init::Function=nop_init_kernel)
+
+Prepares a kernel for execution by setting up an environment for that kernel.
+This function should be invoked just prior to running the kernel. Its
+functionality is included in [`@cuda`](@ref).
+
+The 'init' keyword argument is a function that takes a kernel as argument and
+sets up an environment for the kernel.
+"""
+function prepare_kernel(kernel::Kernel{F,TT}; init::Function=nop_init_kernel) where {F,TT}
+    # Just call the 'init' function for now.
+    init(kernel)
+end
+
 # There doesn't seem to be a way to access the documentation for the call-syntax,
 # so attach it to the type
 """
@@ -338,4 +361,9 @@ This is a common requirement, eg. when using shuffle intrinsics.
 function nearest_warpsize(dev::CuDevice, threads::Integer)
     ws = CUDAdrv.warpsize(dev)
     return threads + (ws - threads % ws) % ws
+end
+
+function nop_init_kernel(kernel::Kernel{F,TT}) where {F,TT}
+    # Do nothing.
+    return
 end
