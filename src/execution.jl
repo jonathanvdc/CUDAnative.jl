@@ -183,6 +183,7 @@ kernel to determine the launch configuration:
         kernel_args = cudaconvert.(args)
         kernel_tt = Tuple{Core.Typeof.(kernel_args)...}
         kernel = cufunction(f, kernel_tt; compilation_kwargs)
+        prepare_kernel(kernel; environment_kwargs)
         kernel(kernel_args...; launch_kwargs)
     end
 """
