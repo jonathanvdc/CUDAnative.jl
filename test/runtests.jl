@@ -63,6 +63,7 @@ if CUDAnative.configured
         else
             include("device/codegen.jl")
             include("device/execution.jl")
+            include("device/interrupts.jl")
             include("device/pointer.jl")
             include("device/array.jl")
             include("device/intrinsics.jl")
