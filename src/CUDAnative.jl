@@ -32,6 +32,7 @@ include(joinpath("device", "runtime_intrinsics.jl"))
 
 include("compiler.jl")
 include("execution.jl")
+include("interrupts.jl")
 include("reflection.jl")
 
 include("deprecated.jl")
