@@ -126,7 +126,11 @@ function emit_function!(mod, cap, f, types, name)
     tt = Base.to_tuple_type(types)
     ctx = CompilerContext(f, tt, cap, #= kernel =# false)
     new_mod, entry = irgen(ctx)
-    entry = optimize!(ctx, new_mod, entry)
+    # Optimize the module that defines the function, but don't
+    # internalize symbols in that function yet: internalizing
+    # globals may de-alias references to globals in the runtime
+    # library from equivalent references in the kernel.
+    entry = optimize!(ctx, new_mod, entry; internalize = false)
     LLVM.name!(entry, name)
 
     link!(mod, new_mod)
