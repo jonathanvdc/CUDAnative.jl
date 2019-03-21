@@ -70,7 +70,12 @@ function optimize!(ctx::CompilerContext, mod::LLVM.Module, entry::LLVM.Function;
 
         ModulePassManager() do pm
             initialize!(pm)
-            add!(pm, ModulePass("FinalLowerGCGPU", lower_final_gc_intrinsics!))
+            if ctx.gc
+                add!(pm, FunctionPass("InsertSafepointsGPUGC", fun -> insert_safepoints_gpugc!(fun, entry)))
+                add!(pm, ModulePass("FinalLowerGPUGC", lower_final_gc_intrinsics_gpugc!))
+            else
+                add!(pm, ModulePass("FinalLowerNoGC", lower_final_gc_intrinsics_nogc!))
+            end
             aggressive_dce!(pm) # remove dead uses of ptls
             add!(pm, ModulePass("LowerPTLS", lower_ptls!))
             run!(pm, mod)
@@ -80,15 +85,6 @@ function optimize!(ctx::CompilerContext, mod::LLVM.Module, entry::LLVM.Function;
     # PTX-specific optimizations
     ModulePassManager() do pm
         initialize!(pm)
-        # lower intrinsics
-        if ctx.gc
-            add!(pm, FunctionPass("InsertSafepointsGPUGC", fun -> insert_safepoints_gpugc!(fun, entry)))
-            add!(pm, ModulePass("FinalLowerGPUGC", lower_final_gc_intrinsics_gpugc!))
-        else
-            add!(pm, ModulePass("FinalLowerNoGC", lower_final_gc_intrinsics_nogc!))
-        end
-        aggressive_dce!(pm) # remove dead uses of ptls
-        add!(pm, ModulePass("LowerPTLS", lower_ptls!))
 
         # NVPTX's target machine info enables runtime unrolling,
         # but Julia's pass sequence only invokes the simple unroller.
@@ -396,6 +392,7 @@ function eager_lower_gc_frame!(fun::LLVM.Function)
 
         @compiler_assert isempty(uses(barrier)) ctx
     end
+end
 
 # Visits all calls to a particular intrinsic in a given LLVM module
 # and redirects those calls to a different function.

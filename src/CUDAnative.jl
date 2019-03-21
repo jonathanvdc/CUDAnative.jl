@@ -27,9 +27,6 @@ include(joinpath("device", "tools.jl"))
 include(joinpath("device", "pointer.jl"))
 include(joinpath("device", "array.jl"))
 include(joinpath("device", "cuda.jl"))
-include(joinpath("device", "runtime.jl"))
-include(joinpath("device", "libdevice.jl"))
-include(joinpath("device", "cuda_intrinsics.jl"))
 include(joinpath("device", "threading.jl"))
 
 # The interrupts and GC files need to be loaded _before_ the
@@ -37,7 +34,7 @@ include(joinpath("device", "threading.jl"))
 # depend on the GC and the GC depends on interrupts.
 include("interrupts.jl")
 include("gc.jl")
-include(joinpath("device", "runtime_intrinsics.jl"))
+include(joinpath("device", "runtime.jl"))
 
 include("compiler.jl")
 include("execution.jl")
